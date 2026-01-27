@@ -73,6 +73,7 @@ class ModernSafeMedApp(Tk):
         self.selected_cols = []
         self.deidentified_text = ""
         self.deidentified_stats = {}
+        self.deidentified_df = None
         self.backend_used = ""
         
         self._build_ui()
@@ -406,6 +407,9 @@ class ModernSafeMedApp(Tk):
         """执行脱敏操作"""
         self.prog.start()
         try:
+            # 脱敏前先保存框内用户的编辑内容
+            user_edited_text = self.txt_out.get("1.0", "end").rstrip() if self.txt_out.get("1.0", "end").strip() else None
+            
             # 获取脱敏选项
             enable_categories = {
                 "id_like": self.enable_id.get(),
@@ -434,15 +438,25 @@ class ModernSafeMedApp(Tk):
                 self.deidentified_stats = stats
                 self.backend_used = backend
                 
-                self.txt_out.delete("1.0", "end")
-                self.txt_out.insert("end", deid_text[:5000])
-                
-                # 高亮修改的内容
-                self._highlight_modifications(deid_text[:5000], stats)
+                # 仅在预览模式下显示脱敏结果，避免导出时出现闪屏
+                if preview_only:
+                    self.txt_out.delete("1.0", "end")
+                    self.txt_out.insert("end", deid_text[:5000])
+                    # 高亮修改的内容
+                    self._highlight_modifications(deid_text[:5000], stats)
                 
                 if not preview_only:
+                    # 导出用户编辑后的内容（优先使用脱敏前保存的用户编辑）
+                    export_text = user_edited_text if user_edited_text else deid_text
+                    
                     out_path = suggest_output_path(self.loaded.path, Path(self.output_dir.get()))
-                    save_text(out_path, deid_text)
+                    save_text(out_path, export_text)
+                    
+                    # 导出后恢复框内的用户编辑内容（保持框内显示用户编辑的内容）
+                    if user_edited_text:
+                        self.txt_out.delete("1.0", "end")
+                        self.txt_out.insert("end", user_edited_text)
+                    
                     self._log(f"✓ 脱敏完成！已保存: {out_path}")
                     messagebox.showinfo("成功", f"文件已脱敏并保存到:\n{out_path}")
                 else:
@@ -460,12 +474,24 @@ class ModernSafeMedApp(Tk):
                 self.deidentified_text = "\n".join(deidentified_paras[:10])
                 self.deidentified_stats = total_stats
                 
-                self.txt_out.delete("1.0", "end")
-                self.txt_out.insert("end", self.deidentified_text[:5000])
+                # 仅在预览模式下显示脱敏结果，避免导出时出现闪屏
+                if preview_only:
+                    self.txt_out.delete("1.0", "end")
+                    self.txt_out.insert("end", self.deidentified_text[:5000])
                 
                 if not preview_only:
+                    # 导出用户编辑后的内容（优先使用脱敏前保存的用户编辑）
+                    if user_edited_text:
+                        deidentified_paras[0] = user_edited_text
+                    
                     out_path = suggest_output_path(self.loaded.path, Path(self.output_dir.get()))
                     save_docx(out_path, deidentified_paras)
+                    
+                    # 导出后恢复框内的用户编辑内容
+                    if user_edited_text:
+                        self.txt_out.delete("1.0", "end")
+                        self.txt_out.insert("end", user_edited_text)
+                    
                     self._log(f"✓ DOCX脱敏完成！已保存: {out_path}")
                     messagebox.showinfo("成功", f"文件已脱敏并保存到:\n{out_path}")
                 else:
@@ -493,15 +519,18 @@ class ModernSafeMedApp(Tk):
                     df[col] = new_col
                 
                 preview_df = df.head(5)
-                self.txt_out.delete("1.0", "end")
-                self.txt_out.insert("end", preview_df.to_string(index=False)[:5000])
+                # 仅在预览模式下显示脱敏结果，避免导出时出现闪屏
+                if preview_only:
+                    self.txt_out.delete("1.0", "end")
+                    preview_str = preview_df.to_string(index=False)[:5000]
+                    self.txt_out.insert("end", preview_str)
+                
+                # 保存当前DataFrame作为最终导出版本
+                self.deidentified_df = df.copy()
                 
                 if not preview_only:
                     out_path = suggest_output_path(self.loaded.path, Path(self.output_dir.get()))
-                    if self.loaded.path.suffix.lower() == '.csv':
-                        save_df(out_path, df)
-                    else:
-                        save_df(out_path, df)
+                    save_df(out_path, self.deidentified_df)
                     self._log(f"✓ 表格脱敏完成！已保存: {out_path}")
                     messagebox.showinfo("成功", f"文件已脱敏并保存到:\n{out_path}")
                 else:
