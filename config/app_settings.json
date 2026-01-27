@@ -1,0 +1,14 @@
+{
+  "output_dir": "",
+  "preview_rows": 50,
+  "replacement_mode": "tag",
+  "enable_categories": {
+    "id_like": true,
+    "phone": true,
+    "email": true,
+    "date": true,
+    "hospital_dict": true,
+    "surname_dict": false,
+    "suffix_dict": false
+  }
+}
