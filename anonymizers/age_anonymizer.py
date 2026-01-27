@@ -6,9 +6,10 @@
 # @brief: 年龄脱敏
 
 import re
+from typing import Union
 
 
-def age_to_range(age: str | int) -> str:
+def age_to_range(age: Union[str, int]) -> str:
     '''
     将年龄转换为年龄段，例如 15 → 10～20岁
     :param age: 年龄 例如：15
